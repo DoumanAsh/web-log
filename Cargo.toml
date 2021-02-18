@@ -1,0 +1,21 @@
+[package]
+name = "web-log"
+version = "1.0.0"
+authors = ["Douman <douman@gmx.se>"]
+edition = "2018"
+license = "BSL-1.0"
+repository = "https://github.com/DoumanAsh/web-log"
+readme = "README.md"
+description = "Simple utilities to write into browser's console"
+keywords = ["wasm", "web", "log", "print"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md"
+]
+
+[features]
+std = []
+
+[dependencies]
+wasm-bindgen = "0.2"
