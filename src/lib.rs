@@ -135,7 +135,34 @@ impl Console {
 
     #[inline]
     fn copy_data<'a>(&mut self, text: &'a [u8]) -> &'a [u8] {
-        let write_len = cmp::min(BUFFER_CAPACITY.saturating_sub(self.len), text.len());
+        let mut write_len = cmp::min(BUFFER_CAPACITY.saturating_sub(self.len), text.len());
+
+        #[inline(always)]
+        fn is_char_boundary(text: &[u8], idx: usize) -> bool {
+            if idx == 0 {
+                return true;
+            }
+
+            match text.get(idx) {
+                None => idx == text.len(),
+                Some(&byte) => (byte as i8) >= -0x40
+            }
+        }
+
+        #[inline(never)]
+        #[cold]
+        fn shift_by_char_boundary(text: &[u8], mut size: usize) -> usize {
+            while !is_char_boundary(text, size) {
+                size -= 1;
+            }
+            size
+        }
+
+        if !is_char_boundary(text, write_len) {
+            //0 is always char boundary so 0 - 1 is impossible
+            write_len = shift_by_char_boundary(text, write_len - 1);
+        }
+
         unsafe {
             ptr::copy_nonoverlapping(text.as_ptr(), self.as_mut_ptr().add(self.len), write_len);
         }
@@ -257,5 +284,23 @@ mod tests {
         assert_eq!(writer.len, 4);
         writer.flush();
         assert_eq!(writer.len, 0);
+    }
+
+    #[test]
+    fn should_handle_write_overflow_outside_of_char_boundary() {
+        let mut writer = Console::new(ConsoleType::Warn);
+        let data = DATA.as_bytes();
+
+        for idx in 1..=409 {
+            writer.write_data(data);
+            assert_eq!(writer.len, data.len() * idx);
+        }
+
+        writer.write_data(b"1234");
+        assert_eq!(4094, writer.len);
+        let unicode = "ロリ";
+        writer.write_data(unicode.as_bytes());
+        assert_eq!(writer.len, unicode.len());
+        assert_eq!(writer.buffer(), unicode.as_bytes());
     }
 }
